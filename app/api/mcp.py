@@ -171,7 +171,7 @@ async def handle_json_rpc(request: JsonRpcRequest):
                     # Assuming Zilean returns list of {raw_title, size, info_hash}
                     mapped_results.append({
                         "id": res.get("info_hash"),
-                        "provider": "Omega/Indo (Zilean)",
+                        "provider": "VOID Omega MCP",
                         "title": res.get("filename") or res.get("raw_title") or query,
                         "size": res.get("size_bytes", "Unknown"), # Need fmt
                         "quality": "1080p", # TODO: Parse from title
