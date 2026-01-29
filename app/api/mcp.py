@@ -1,6 +1,6 @@
 import json
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sse_starlette.sse import EventSourceResponse
 from pydantic import BaseModel
 from typing import Dict, Any, Optional, List
@@ -88,7 +88,7 @@ async def handle_json_rpc(request: JsonRpcRequest):
 
         if method == "notifications/initialized":
              # Notifications don't get responses in JSON-RPC spec
-             return JSONResponse(status_code=204)  # No Content
+             return Response(status_code=204)  # No Content
 
 
         if method == "tools/list":
