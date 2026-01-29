@@ -175,13 +175,59 @@ async def handle_json_rpc(request: JsonRpcRequest):
                 # If "Show S01E02" fails, try just "Show Name" and hoping Zilean finds a Season Pack or misnamed file.
                 if not results and media_type == "show":
                     logger.info(f"Fallback search returned 0 results. Trying desperation search: {title}")
-                    results = await zilean_service.search_stream(
+                    desperation_results = await zilean_service.search_stream(
                         title=title,
                         year=None,
                         imdb_id=None,
                         season=None,
                         episode=None
                     )
+                    
+                    # Smart Filter: Remove obvious mismatches to reduce clutter
+                    # Regex to find SxxEyy or 1x02 patterns
+                    if desperation_results and season:
+                        filtered_desperation = []
+                        import re
+                        
+                        # Patterns: S01E02, 1x02, S01
+                        # We want to keep:
+                        # 1. Exact Episode Matches
+                        # 2. Season Packs (Match Season, No Episode)
+                        # 3. Ambiguous files (No S/E detected)
+                        
+                        for item in desperation_results:
+                            item_title = (item.get("raw_title") or item.get("filename") or "").upper()
+                            
+                            # Parse Season
+                            # Look for S01, Season 1, 1x
+                            s_match = re.search(r'(?:S|SEASON\W?)(\d{1,2})|(\d{1,2})[xX]\d+', item_title)
+                            item_season = int(s_match.group(1) or s_match.group(2)) if s_match else None
+                            
+                            # Parse Episode
+                            # Look for E01, x01
+                            e_match = re.search(r'[xE](\d{1,3})', item_title)
+                            item_episode = int(e_match.group(1)) if e_match else None
+                            
+                            # Logic:
+                            # If we detect a Season, it MUST match the requested season
+                            if item_season and item_season != season:
+                                continue # Wrong Season
+                                
+                            # If we detect an Episode, it MUST match the requested episode
+                            # UNLESS we want to allow full season packs, but usually season packs don't have "E01" in the main title 
+                            # (or if they do, it's usually "S01E01-E10")
+                            # For safety, if we see a specific single episode number that ISN'T ours, skip it.
+                            if item_episode and episode and item_episode != episode:
+                                # Check for multi-episode range (e.g. E01-E10) - simplifying for now
+                                # If simple mismatch, skip
+                                continue 
+                                
+                            filtered_desperation.append(item)
+                            
+                        logger.info(f"Desperation search found {len(desperation_results)}, filtered to {len(filtered_desperation)}")
+                        results = filtered_desperation
+                    else:
+                        results = desperation_results
                 
                 # Format for MCP
                 # We return a list of "StreamSource" compatible JSONs
