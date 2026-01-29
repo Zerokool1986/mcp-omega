@@ -165,18 +165,46 @@ async def handle_json_rpc(request: JsonRpcRequest):
                 # Let's map to standard VOID structure:
                 # { "id": "hash", "name": "...", "size": "...", "provider": "Omega", "info_hash": "..." }
                 
+                def format_size(size_bytes):
+                    if not size_bytes:
+                        return "Unknown"
+                    try:
+                        bytes_val = float(size_bytes)
+                        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+                            if bytes_val < 1024.0:
+                                return f"{bytes_val:.2f} {unit}"
+                            bytes_val /= 1024.0
+                        return f"{bytes_val:.2f} PB"
+                    except:
+                        return "Unknown"
+
+                def infer_quality(title):
+                    lower = title.lower()
+                    if "2160p" in lower or "4k" in lower:
+                        return "4K"
+                    if "1080p" in lower:
+                        return "1080p"
+                    if "720p" in lower:
+                        return "720p"
+                    if "480p" in lower:
+                        return "480p"
+                    return "Unknown"
+
                 mapped_results = []
                 for res in results:
                     # Note: Need real Zilean response structure here.
                     # Assuming Zilean returns list of {raw_title, size, info_hash}
+                    filename = res.get("filename") or res.get("raw_title") or query
                     mapped_results.append({
                         "id": res.get("info_hash"),
-                        "provider": "VOID Omega MCP",
-                        "title": res.get("filename") or res.get("raw_title") or query,
-                        "size": res.get("size_bytes", "Unknown"), # Need fmt
-                        "quality": "1080p", # TODO: Parse from title
+                        "provider": "Omega/Indo (Zilean)",
+                        "title": filename,
+                        "size": format_size(res.get("size") or res.get("size_bytes")), 
+                        "size_bytes": res.get("size") or res.get("size_bytes"),
+                        "quality": infer_quality(filename),
                         "info_hash": res.get("info_hash"),
-                        "type": "movie" # TODO: infer
+                        "type": "movie", # TODO: infer
+                        "cached": True # Zilean results are always cached
                     })
                 
                 return {
