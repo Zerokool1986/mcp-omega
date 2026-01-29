@@ -69,7 +69,7 @@ class TorBoxService:
                 # 2. Get Torrent Info (fallback) with Retries
                 # Sometimes a "cached" torrent takes a moment to hydrate the files list (stuck in metaDL).
                 
-                for attempt in range(10):
+                for attempt in range(30):
                     logger.info(f"Fetching TorBox list for ID: {torrent_id} (Attempt {attempt+1}/3)")
                     
                     info_resp = await self.client.get(f"{self.base_url}/api/torrents/mylist?bypass_cache=true", headers=headers)
