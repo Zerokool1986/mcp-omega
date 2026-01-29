@@ -113,6 +113,26 @@ class TorBoxService:
                  logger.error("No suitable files found in torrent (even after retries)")
                  return None
 
+            # Debug: Log first file to check structure
+            if files:
+                logger.info(f"First file sample: {files[0]}")
+
+            # Sort by size desc
+            video_files = [f for f in files if f.get("name", "").lower().endswith((".mp4", ".mkv", ".avi", ".mov", ".webm"))]
+            
+            if video_files:
+                video_files.sort(key=lambda x: x.get("size", 0), reverse=True)
+                best_file_id = video_files[0].get("id")
+                if not best_file_id:
+                     logger.warning(f"Best video file missing ID: {video_files[0]}")
+            else:
+                 # Fallback to largest file period
+                 files.sort(key=lambda x: x.get("size", 0), reverse=True)
+                 if files:
+                     best_file_id = files[0].get("id")
+                     if not best_file_id:
+                         logger.warning(f"Fallback file missing ID: {files[0]}")
+
             # 3. Request Download Link
             # Ensure IDs are integers and token is passed if required by endpoint
             try:
