@@ -13,18 +13,19 @@ class ZileanService:
         Search Zilean for DMM-verified cached streams.
         """
         try:
-            # Zilean typically searches by query string
-            # Adjust endpoint based on actual Zilean API documentation
-            params = {"query": title}
+            #Zilean API endpoint: /dmm/filtered
+            # Query parameter should be the search string
+            params = {"Query": title}  # Capital Q based on common DMM implementations
             
-            # NOTE: This is a provisional endpoint structure based on common DMM scrapers.
-            # We will refine this once we verify Zilean's exact Swagger/OpenAPI spec.
-            response = await self.client.get(f"{self.base_url}/dmm/search", params=params) 
+            logger.info(f"Zilean Search: {self.base_url}/dmm/filtered with params {params}")
+            response = await self.client.get(f"{self.base_url}/dmm/filtered", params=params) 
             response.raise_for_status()
             
             results = response.json()
+            logger.info(f"Zilean returned {len(results) if isinstance(results, list) else 0} results")
+            
             # Transform to generic internal format
-            return results 
+            return results if isinstance(results, list) else []
             
         except Exception as e:
             logger.error(f"Zilean Search Failed: {e}")
