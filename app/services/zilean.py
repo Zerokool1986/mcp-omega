@@ -8,7 +8,7 @@ class ZileanService:
         self.base_url = settings.ZILEAN_API_URL
         self.client = httpx.AsyncClient(timeout=10.0)
 
-    async def search_stream(self, title: str, year: int = None, imdb_id: str = None) -> List[dict]:
+    async def search_stream(self, title: str, year: int = None, imdb_id: str = None, **kwargs) -> List[dict]:
         """
         Search Zilean for DMM-verified cached streams.
         """
