@@ -31,13 +31,12 @@ class TorBoxService:
             # If cached, it's instant.
             add_payload = {
                 "magnet": f"magnet:?xt=urn:btih:{info_hash}",
-                "seed": 1, 
-                "allow_zip": False
+                "seed": "1", 
+                "allow_zip": "false"
             }
             
-            # Use multipart/form-data as per some docs, or json? 
-            # TorBox API v1 usually accepts form data or JSON. Let's try JSON first.
-            resp = await self.client.post(f"{self.base_url}/api/torrents/createtorrent", json=add_payload, headers=headers)
+            # Use data= for form-encoded (multipart/form-data not strictly needed unless file upload, but form-urlencoded is safer)
+            resp = await self.client.post(f"{self.base_url}/api/torrents/createtorrent", data=add_payload, headers=headers)
             
             if resp.status_code != 200:
                 logger.error(f"TorBox Add Failed: {resp.text}")
