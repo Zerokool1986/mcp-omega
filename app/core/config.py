@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     
     # Tier 1: Zilean
-    ZILEAN_API_URL: str = "https://zilean.elfhosted.com/api"  # Default or configurable
+    ZILEAN_API_URL: str = "https://zilean.elfhosted.com"  # ElfHosted public Zilean instance
     
     # Tier 2: Debrid Services (API Keys injected by Client or Env)
     TORBOX_API_KEY: Optional[str] = None
