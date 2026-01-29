@@ -66,8 +66,10 @@ class TorBoxService:
             
             # If instant cache, we might get files immediately, but usually need to query list
             # Poll a few times for files to appear if needed
-            for attempt in range(3):
-                logger.info(f"Fetching TorBox list for ID: {torrent_id} (Attempt {attempt+1}/3)")
+            # "checking" state can take a moment even if cached. Increase retries.
+            max_retries = 10
+            for attempt in range(max_retries):
+                logger.info(f"Fetching TorBox list for ID: {torrent_id} (Attempt {attempt+1}/{max_retries})")
                 list_resp = await self.client.get(f"{self.base_url}/api/torrents/mylist?bypass_cache=true", headers=headers)
                 
                 if list_resp.status_code == 200:
@@ -88,7 +90,7 @@ class TorBoxService:
                         else:
                             logger.warning("Torrent found but has no files (hydrating?). Waiting...")
                 
-                if attempt < 2:
+                if attempt < max_retries - 1:
                     await asyncio.sleep(1.5)
             
             if not target_torrent:
