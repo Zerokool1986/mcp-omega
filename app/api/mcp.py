@@ -280,7 +280,7 @@ async def handle_json_rpc(request: JsonRpcRequest):
                          
                     mapped_results.append({
                         "id": res.get("info_hash"),
-                        "provider": "Omega/Indo (Zilean)",
+                        "provider": "VOID Omega MCP", # Must match Server Name for client routing
                         "title": filename,
                         "size": format_size(raw_size or res.get("size")), 
                         "size_bytes": safe_int(raw_size),
