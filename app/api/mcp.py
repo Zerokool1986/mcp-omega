@@ -172,7 +172,7 @@ async def handle_json_rpc(request: JsonRpcRequest):
                     mapped_results.append({
                         "id": res.get("info_hash"),
                         "provider": "Omega/Indo (Zilean)",
-                        "name": res.get("filename") or res.get("raw_title") or query,
+                        "title": res.get("filename") or res.get("raw_title") or query,
                         "size": res.get("size_bytes", "Unknown"), # Need fmt
                         "quality": "1080p", # TODO: Parse from title
                         "info_hash": res.get("info_hash"),
