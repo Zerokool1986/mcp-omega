@@ -43,34 +43,42 @@ class TorBoxService:
                 return None
                 
             data = resp.json()
+            logger.info(f"TorBox Create Response: {data}")
+
             if not data.get("success"):
                  logger.error(f"TorBox Add Error: {data}")
                  return None
             
-            torrent_id = data.get("data", {}).get("torrent_id")
-            if not torrent_id:
-                 # Sometimes it returns existing torrent info
-                 torrent_id = data.get("data", {}).get("id")
+            # Check if 'data' block itself contains file info (sometimes it does)
+            torrent_info = data.get("data", {})
+            torrent_id = torrent_info.get("torrent_id") or torrent_info.get("id")
+            files_from_create = torrent_info.get("files") # Optimistic check
 
             if not torrent_id:
                 logger.error("Could not determine Torrent ID from TorBox response")
                 return None
-
-            # 2. Get Torrent Info (to find the file ID if not provided)
-            # We need to find the largest video file if no fileIndex/ID is given.
-            info_resp = await self.client.get(f"{self.base_url}/api/torrents/mylist", headers=headers)
-            info_data = info_resp.json()
             
-            # Find our torrent
             target_torrent = None
-            if info_data.get("success"):
-                for t in info_data.get("data", []):
-                    if str(t.get("id")) == str(torrent_id):
-                        target_torrent = t
-                        break
+
+            # If create response already gave us the files, use them!
+            if files_from_create:
+                logger.info("TorBox returned files in create response, skipping list lookups")
+                target_torrent = torrent_info
+            else:
+                # 2. Get Torrent Info (fallback)
+                logger.info(f"Fetching TorBox list for ID: {torrent_id}")
+                info_resp = await self.client.get(f"{self.base_url}/api/torrents/mylist?bypass_cache=true", headers=headers)
+                info_data = info_resp.json()
+                logger.info(f"TorBox MyList Response (Success={info_data.get('success')}): {str(info_data)[:500]}") # Truncate likely big list
+                
+                if info_data.get("success"):
+                    for t in info_data.get("data", []):
+                        if str(t.get("id")) == str(torrent_id):
+                            target_torrent = t
+                            break
             
             if not target_torrent:
-                logger.error("Torrent added but not found in list")
+                logger.error(f"Torrent {torrent_id} added but not found in list.")
                 return None
                 
             # Find best file (largest video)
