@@ -28,18 +28,14 @@ async def sse_endpoint(request: Request):
     MCP Handshake via Server-Sent Events.
     """
     async def event_generator():
-        # In a real deployment, this should be the public URL.
-        # For now, we assume standard local setup or relative paths if client supports it.
-        # But MCP spec usually requires full URI for endpoint.
+        # Construct the full public URL
+        # Use the Host header to get the correct domain (critical for Render)
+        host = request.headers.get("host", str(request.base_url).replace("http://", "").replace("https://", "").rstrip("/"))
         
-        # HACK: For Android Emulator loopback
-        # If running in emulator, the client sees 10.0.2.2.
-        # If running on LAN, it sees 192.168.x.x.
+        # Determine protocol (Render uses https)
+        proto = "https" if "render.com" in host or request.headers.get("x-forwarded-proto") == "https" else "http"
         
-        # We'll just send a relative path or generic one, hoping the Client handles it.
-        # Actually, let's use the Request headers to reconstruct base if possible.
-        base_url = str(request.base_url).rstrip("/")
-        endpoint_url = f"{base_url}/mcp/messages"
+        endpoint_url = f"{proto}://{host}/mcp/messages"
 
         logger.info(f"Client connected. Sending endpoint: {endpoint_url}")
         
@@ -47,6 +43,8 @@ async def sse_endpoint(request: Request):
             "event": "endpoint",
             "data": endpoint_url
         }
+        
+        logger.info(f"Endpoint event sent successfully: {endpoint_url}")
         
         # Keep alive
         import asyncio
@@ -87,9 +85,11 @@ async def handle_json_rpc(request: JsonRpcRequest):
                 }
             }
 
+
         if method == "notifications/initialized":
-             # Client ack
-             return {"jsonrpc": "2.0", "id": req_id, "result": True}
+             # Notifications don't get responses in JSON-RPC spec
+             return JSONResponse(status_code=204)  # No Content
+
 
         if method == "tools/list":
             return {
