@@ -117,6 +117,8 @@ async def handle_json_rpc(request: JsonRpcRequest):
                                 "properties": {
                                     "source_id": {"type": "string"}, # info_hash
                                     "info_hash": {"type": "string"},
+                                    "season": {"type": "integer"},
+                                    "episode": {"type": "integer"},
                                     "api_keys": { # Enforce passing API keys in request
                                         "type": "object",
                                         "properties": {
@@ -319,7 +321,19 @@ async def handle_json_rpc(request: JsonRpcRequest):
                         "error": {"code": -32602, "message": "Missing info_hash"}
                     }
 
-                stream_url = await torbox_service.resolve_stream(torbox_key, info_hash)
+                source_id = args.get("source_id") or info_hash
+                magnet = args.get("magnet") or ""
+                season = args.get("season")
+                episode = args.get("episode")
+
+                stream_url = await torbox_service.resolve_stream(
+                    source_id=source_id,
+                    info_hash=info_hash,
+                    magnet=magnet,
+                    api_key=torbox_key,
+                    season=season,
+                    episode=episode
+                )
                 
                 if stream_url:
                      return {
