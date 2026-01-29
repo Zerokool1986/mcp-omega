@@ -1,4 +1,5 @@
 import httpx
+import asyncio
 from loguru import logger
 from typing import Optional, Dict
 from app.core.config import settings
@@ -65,17 +66,40 @@ class TorBoxService:
                 logger.info("TorBox returned files in create response, skipping list lookups")
                 target_torrent = torrent_info
             else:
-                # 2. Get Torrent Info (fallback)
-                logger.info(f"Fetching TorBox list for ID: {torrent_id}")
-                info_resp = await self.client.get(f"{self.base_url}/api/torrents/mylist?bypass_cache=true", headers=headers)
-                info_data = info_resp.json()
-                logger.info(f"TorBox MyList Response (Success={info_data.get('success')}): {str(info_data)[:500]}") # Truncate likely big list
+                # 2. Get Torrent Info (fallback) with Retries
+                # Sometimes a "cached" torrent takes a moment to hydrate the files list (stuck in metaDL).
                 
-                if info_data.get("success"):
-                    for t in info_data.get("data", []):
-                        if str(t.get("id")) == str(torrent_id):
-                            target_torrent = t
+                for attempt in range(3):
+                    logger.info(f"Fetching TorBox list for ID: {torrent_id} (Attempt {attempt+1}/3)")
+                    
+                    info_resp = await self.client.get(f"{self.base_url}/api/torrents/mylist?bypass_cache=true", headers=headers)
+                    info_data = info_resp.json()
+                    
+                    # Log less to keep it clean, but enough to debug
+                    logger.info(f"TorBox MyList Success={info_data.get('success')}")
+                    
+                    if info_data.get("success"):
+                        for t in info_data.get("data", []):
+                            if str(t.get("id")) == str(torrent_id):
+                                target_torrent = t
+                                break
+                    
+                    if target_torrent:
+                        state = target_torrent.get("download_state")
+                        files = target_torrent.get("files", [])
+                        logger.info(f"Torrent State: {state}, Files: {len(files)}")
+                        
+                        if files:
+                            # We have files, we are good!
                             break
+                        else:
+                            # Found torrent, but no files yet (metaDL?). Wait and retry.
+                            logger.warning("Torrent found but has no files (hydrating?). Waiting...")
+                    
+                    if attempt < 2:
+                        await asyncio.sleep(1.5)
+                        # Reset for next loop to force re-fetch
+                        target_torrent = None 
             
             if not target_torrent:
                 logger.error(f"Torrent {torrent_id} added but not found in list.")
@@ -86,23 +110,8 @@ class TorBoxService:
             best_file_id = None
             
             if not files:
-                # Some APIs return files in a separate endpoint or format
-                pass
-            else:
-                # Sort by size desc
-                video_files = [f for f in files if f.get("name", "").lower().endswith((".mp4", ".mkv", ".avi"))]
-                if video_files:
-                    video_files.sort(key=lambda x: x.get("size", 0), reverse=True)
-                    best_file_id = video_files[0].get("id")
-                else:
-                     # Fallback to largest file period
-                     files.sort(key=lambda x: x.get("size", 0), reverse=True)
-                     if files:
-                         best_file_id = files[0].get("id")
-
-            if not best_file_id:
-                logger.error("No suitable files found in torrent")
-                return None
+                 logger.error("No suitable files found in torrent (even after retries)")
+                 return None
 
             # 3. Request Download Link
             link_payload = {
