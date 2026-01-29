@@ -149,7 +149,14 @@ async def handle_json_rpc(request: JsonRpcRequest):
                     query = f"{title} S{season:02d}E{episode:02d}"
                 
                 # Zilean Generic Search
-                results = await zilean_service.search_stream(title=query, year=year, imdb_id=imdb)
+                # Pass raw title; Zilean Filtered endpoint handles Season/Episode/Year filtering
+                results = await zilean_service.search_stream(
+                    title=title, 
+                    year=year, 
+                    imdb_id=imdb, 
+                    season=season, 
+                    episode=episode
+                )
                 
                 # Format for MCP
                 # We return a list of "StreamSource" compatible JSONs
