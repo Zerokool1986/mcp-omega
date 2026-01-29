@@ -149,7 +149,7 @@ async def handle_json_rpc(request: JsonRpcRequest):
                     query = f"{title} S{season:02d}E{episode:02d}"
                 
                 # Zilean Generic Search
-                # Pass raw title; Zilean Filtered endpoint handles Season/Episode/Year filtering
+                # Attempt 1: Structured Search
                 results = await zilean_service.search_stream(
                     title=title, 
                     year=year, 
@@ -157,6 +157,19 @@ async def handle_json_rpc(request: JsonRpcRequest):
                     season=season, 
                     episode=episode
                 )
+
+                # Attempt 2: Fallback to String Query (if no results and is a show)
+                if not results and media_type == "show" and season and episode:
+                    fallback_query = f"{title} S{season:02d}E{episode:02d}"
+                    logger.info(f"Structured search returned 0 results. Trying fallback: {fallback_query}")
+                    results = await zilean_service.search_stream(
+                        title=fallback_query,
+                        # Clear specific filters to rely on string matching
+                        year=None,
+                        imdb_id=None, 
+                        season=None,
+                        episode=None
+                    )
                 
                 # Format for MCP
                 # We return a list of "StreamSource" compatible JSONs
