@@ -86,7 +86,7 @@ class TorBoxService:
                     
                     if target_torrent:
                         state = target_torrent.get("download_state")
-                        files = target_torrent.get("files", [])
+                        files = target_torrent.get("files") or []
                         logger.info(f"Torrent State: {state}, Files: {len(files)}")
                         
                         if files:
@@ -106,7 +106,7 @@ class TorBoxService:
                 return None
                 
             # Find best file (largest video)
-            files = target_torrent.get("files", [])
+            files = target_torrent.get("files") or []
             best_file_id = None
             
             if not files:
