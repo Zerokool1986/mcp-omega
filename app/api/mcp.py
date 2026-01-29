@@ -215,17 +215,29 @@ async def handle_json_rpc(request: JsonRpcRequest):
                         return "480p"
                     return "Unknown"
 
+                def safe_int(val):
+                    try:
+                        return int(val)
+                    except:
+                        return None
+
                 mapped_results = []
                 for res in results:
                     # Note: Need real Zilean response structure here.
                     # Assuming Zilean returns list of {raw_title, size, info_hash}
                     filename = res.get("filename") or res.get("raw_title") or query
+                    
+                    # Zilean might return 'size' as string or 'size_bytes' as int
+                    raw_size = res.get("size_bytes")
+                    if raw_size is None and str(res.get("size", "")).isdigit():
+                         raw_size = res.get("size")
+                         
                     mapped_results.append({
                         "id": res.get("info_hash"),
                         "provider": "Omega/Indo (Zilean)",
                         "title": filename,
-                        "size": format_size(res.get("size") or res.get("size_bytes")), 
-                        "size_bytes": res.get("size") or res.get("size_bytes"),
+                        "size": format_size(raw_size or res.get("size")), 
+                        "size_bytes": safe_int(raw_size),
                         "quality": infer_quality(filename),
                         "info_hash": res.get("info_hash"),
                         "type": "movie", # TODO: infer
