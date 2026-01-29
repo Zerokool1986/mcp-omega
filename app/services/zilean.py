@@ -13,12 +13,16 @@ class ZileanService:
         Search Zilean for DMM-verified cached streams.
         """
         try:
-            #Zilean API endpoint: /dmm/filtered
-            # Query parameter should be the search string
-            params = {"Query": title}  # Capital Q based on common DMM implementations
+            # Zilean API endpoint: /dmm/search (try this first, then /dmm/filtered)
+            # Try both lowercase 'query' and IMDb ID
+            params = {}
+            if title:
+                params["query"] = title  # Lowercase q
+            if imdb_id:
+                params["imdbId"] = imdb_id  # camelCase based on API schema
             
-            logger.info(f"Zilean Search: {self.base_url}/dmm/filtered with params {params}")
-            response = await self.client.get(f"{self.base_url}/dmm/filtered", params=params) 
+            logger.info(f"Zilean Search: {self.base_url}/dmm/search with params {params}")
+            response = await self.client.get(f"{self.base_url}/dmm/search", params=params) 
             response.raise_for_status()
             
             results = response.json()
