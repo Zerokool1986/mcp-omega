@@ -170,6 +170,18 @@ async def handle_json_rpc(request: JsonRpcRequest):
                         season=None,
                         episode=None
                     )
+
+                # Attempt 3: Desperation Search (Title Only)
+                # If "Show S01E02" fails, try just "Show Name" and hoping Zilean finds a Season Pack or misnamed file.
+                if not results and media_type == "show":
+                    logger.info(f"Fallback search returned 0 results. Trying desperation search: {title}")
+                    results = await zilean_service.search_stream(
+                        title=title,
+                        year=None,
+                        imdb_id=None,
+                        season=None,
+                        episode=None
+                    )
                 
                 # Format for MCP
                 # We return a list of "StreamSource" compatible JSONs
