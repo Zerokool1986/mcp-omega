@@ -114,11 +114,22 @@ class TorBoxService:
                  return None
 
             # 3. Request Download Link
+            # Ensure IDs are integers and token is passed if required by endpoint
+            try:
+                torrent_id_int = int(torrent_id)
+                file_id_int = int(best_file_id)
+            except (ValueError, TypeError):
+                logger.error(f"Invalid ID types - Torrent: {torrent_id}, File: {best_file_id}")
+                return None
+
             link_payload = {
-                "torrent_id": torrent_id,
-                "file_id": best_file_id,
-                "zip_link": False 
+                "token": api_key, # Explicitly pass token if header isn't enough for this endpoint
+                "torrent_id": torrent_id_int, 
+                "file_id": file_id_int,
+                "zip_link": "false" 
             }
+            
+            logger.info(f"Requesting DL with payload: {link_payload}")
             
             link_resp = await self.client.get(
                 f"{self.base_url}/api/torrents/requestdl", 
