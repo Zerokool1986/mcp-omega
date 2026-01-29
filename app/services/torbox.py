@@ -67,9 +67,12 @@ class TorBoxService:
             # If instant cache, we might get files immediately, but usually need to query list
             # Poll a few times for files to appear if needed
             # "checking" state can take a moment even if cached. Increase retries.
-            max_retries = 10
+            max_retries = 30
             for attempt in range(max_retries):
-                logger.info(f"Fetching TorBox list for ID: {torrent_id} (Attempt {attempt+1}/{max_retries})")
+                # Log only every 5 attempts or first one to reduce spam
+                if attempt == 0 or (attempt + 1) % 5 == 0:
+                     logger.info(f"Fetching TorBox list for ID: {torrent_id} (Attempt {attempt+1}/{max_retries})")
+                
                 list_resp = await self.client.get(f"{self.base_url}/api/torrents/mylist?bypass_cache=true", headers=headers)
                 
                 if list_resp.status_code == 200:
@@ -83,15 +86,18 @@ class TorBoxService:
                     if target_torrent:
                         state = target_torrent.get("download_state")
                         files = target_torrent.get("files") or []
-                        logger.info(f"Torrent State: {state}, Files: {len(files)}")
+                        
+                        if attempt == 0 or (attempt + 1) % 5 == 0:
+                            logger.info(f"Torrent State: {state}, Files: {len(files)}")
                         
                         if files:
                             break
-                        else:
+                        elif attempt == 0 or (attempt + 1) % 5 == 0:
+                            # Only warn occasionally
                             logger.warning("Torrent found but has no files (hydrating?). Waiting...")
                 
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(1.5)
+                    await asyncio.sleep(2.0)
             
             if not target_torrent:
                 logger.error(f"Torrent {torrent_id} added but not found in list.")
