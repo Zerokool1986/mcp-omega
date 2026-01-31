@@ -4,6 +4,7 @@ import re
 from loguru import logger
 from typing import Optional, Dict
 from app.services.base import DebridClient
+from app.utils.parser import VideoParser
 
 class RealDebridService(DebridClient):
     """
@@ -96,28 +97,37 @@ class RealDebridService(DebridClient):
         
         video_files = [f for f in files if f.get("path", "").lower().endswith((".mp4", ".mkv", ".avi", ".mov", ".webm"))]
         
+
         if not video_files:
             logger.error("No video files in RD torrent")
             return None
 
-        # Filter based on exclusions
-        if exclude_hevc or exclude_eac3 or exclude_dolby_vision:
-            filtered_files = []
-            for f in video_files:
-                path = f.get("path", "").lower()
-                if exclude_hevc and any(x in path for x in ["hevc", "h265", "x265"]):
-                    continue
-                if exclude_eac3 and any(x in path for x in ["eac3", "ddp", "dd+", "atmos"]):
-                    continue
-                if exclude_dolby_vision and any(x in path for x in ["dovi", "dv", "dolby vision", "hdr10+"]):
-                    continue
-                filtered_files.append(f)
+        # --- SCORE & FILTER FILES (Phase 2) ---
+        ranked_files = []
+        for f in video_files:
+            score = VideoParser.score_file(
+                filename=f.get("path", ""), 
+                size_bytes=f.get("bytes", 0),
+                exclude_hevc=exclude_hevc,
+                exclude_eac3=exclude_eac3,
+                exclude_dolby_vision=exclude_dolby_vision
+            )
             
-            if filtered_files:
-                logger.info(f"Filtered {len(video_files)} files down to {len(filtered_files)} based on restrictions")
-                video_files = filtered_files
-            else:
-                logger.warning("All files filtered out by restrictions! Falling back to all files.")
+            # Filter out files with Hard Exclusion penalty (-1000)
+            if score > -900: 
+                f["_score"] = score
+                ranked_files.append(f)
+        
+        # Sort by Score Descending
+        ranked_files.sort(key=lambda x: x["_score"], reverse=True)
+        
+        if ranked_files:
+             logger.info(f"Scored & Ranked {len(ranked_files)} files. Top: {ranked_files[0]['path']} (Score: {ranked_files[0]['_score']})")
+             video_files = ranked_files
+        else:
+             logger.warning("All files filtered out by restrictions! Falling back to all files (sorted by size).")
+             # Fallback: Sort original by size
+             video_files.sort(key=lambda x: x.get("bytes", 0), reverse=True)
 
         best_file_id = None
         
@@ -133,27 +143,28 @@ class RealDebridService(DebridClient):
                 rf"(?i){season}x{episode}"
             ]
             
-            matches = []
+            # Since video_files is already sorted by score (or size fallback),
+            # the first match we find is the "Best" match.
             for f in video_files:
-                fname = f.get("path", "") # RD uses 'path', sometimes starts with /
+                fname = f.get("path", "")
                 for pat in regex_list:
                     if re.search(pat, fname):
-                        matches.append(f)
+                        best_file_id = f.get("id")
+                        logger.info(f"Selected RD file (Score: {f.get('_score', 'N/A')}): {f.get('path')}")
                         break
+                if best_file_id:
+                    break
             
-            if matches:
-                 # Sort by size (bytes) desc
-                matches.sort(key=lambda x: x.get("bytes", 0), reverse=True)
-                best_file_id = matches[0].get("id")
-                logger.info(f"Selected RD file: {matches[0].get('path')}")
-            else:
-                logger.warning(f"No match for S{season}E{episode}. Fallback to largest.")
+            if not best_file_id:
+                logger.warning(f"No match for S{season}E{episode}. Fallback to highest scored file.")
 
-        # Fallback
+        # Fallback (or Movie selection)
         if not best_file_id:
-            video_files.sort(key=lambda x: x.get("bytes", 0), reverse=True)
+            # video_files is already sorted by score
             best_file_id = video_files[0].get("id")
-            logger.info(f"Selected largest RD file (Fallback): {video_files[0].get('path')}")
+            logger.info(f"Selected highest scored file (Fallback): {video_files[0].get('path')}")
+
+
 
         if not best_file_id:
             return None

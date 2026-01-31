@@ -5,6 +5,7 @@ from sse_starlette.sse import EventSourceResponse
 from pydantic import BaseModel
 from typing import Dict, Any, Optional, List
 from loguru import logger
+from app.utils.parser import VideoParser
 
 from app.services.zilean import zilean_service
 from app.services.torbox import torbox_service
@@ -289,7 +290,7 @@ async def handle_json_rpc(request: JsonRpcRequest):
                         "title": filename,
                         "size": format_size(raw_size or res.get("size")), 
                         "size_bytes": safe_int(raw_size),
-                        "quality": infer_quality(filename),
+                        "quality": infer_quality(filename) + (f" [{VideoParser.get_release_group(filename)}]" if VideoParser.get_release_group(filename) else ""),
                         "info_hash": res.get("info_hash"),
                         "type": "movie", # TODO: infer
                         "cached": True # Zilean results are always cached

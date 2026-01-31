@@ -6,3 +6,4 @@ pydantic-settings
 httpx
 python-dotenv
 loguru
+async-lru
