@@ -135,7 +135,7 @@ class RealDebridService(DebridClient):
                 size_bytes=f.get("bytes", 0),
                 exclude_hevc=exclude_hevc,
                 exclude_eac3=exclude_eac3,
-                exclude_eac3=exclude_eac3,
+
                 exclude_dolby_vision=exclude_dolby_vision
             )
             
