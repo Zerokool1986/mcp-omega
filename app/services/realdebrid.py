@@ -18,6 +18,23 @@ class RealDebridService(DebridClient):
     async def _get_headers(self, api_key: str) -> Dict[str, str]:
         return {"Authorization": f"Bearer {api_key}"}
 
+    async def _get_cached_file_ids(self, info_hash: str, api_key: str) -> Optional[set]:
+        try:
+            headers = await self._get_headers(api_key)
+            resp = await self.client.get(f"{self.base_url}/torrents/instantAvailability/{info_hash}", headers=headers)
+            if resp.status_code == 200:
+                data = resp.json()
+                # Structure: { hash: { "rd": [ {"1":{...}, "2":{...}}, ... ] } }
+                if info_hash.lower() in data:
+                    rd_data = data[info_hash.lower()].get("rd", [])
+                    cached_ids = set()
+                    for variant in rd_data:
+                        cached_ids.update(variant.keys())
+                    return cached_ids
+        except Exception as e:
+            logger.error(f"Error checking instant availability: {e}")
+        return None
+
     async def resolve_stream(
         self, 
         source_id: str, 
@@ -44,7 +61,15 @@ class RealDebridService(DebridClient):
 
         headers = await self._get_headers(api_key)
         
-        # 1. Add Magnet
+        # 1. Check Instant Availability (Pre-Check)
+        # We fetch this to ensure we only select files that are ACTUALLY cached.
+        cached_file_ids = await self._get_cached_file_ids(info_hash, api_key)
+        if cached_file_ids:
+            logger.info(f"Found {len(cached_file_ids)} instantly available file IDs for {info_hash}")
+        else:
+             logger.warning(f"No instant availability found for {info_hash}. Selection might trigger download.")
+
+        # 2. Add Magnet
         logger.info(f"Adding magnet to RD: {info_hash} (S{season}E{episode})")
         
         # RD 'addMagnet' takes 'magnet' form param
@@ -110,8 +135,17 @@ class RealDebridService(DebridClient):
                 size_bytes=f.get("bytes", 0),
                 exclude_hevc=exclude_hevc,
                 exclude_eac3=exclude_eac3,
+                exclude_eac3=exclude_eac3,
                 exclude_dolby_vision=exclude_dolby_vision
             )
+            
+            # --- CHECK INSTANT AVAILABILITY ---
+            # Penalize files not in instant cache to prevent "Torrent is downloading" error
+            if cached_file_ids is not None:
+                # RD file IDs are ints in the file list but strings in availability keys usually
+                fid = str(f.get("id"))
+                if fid not in cached_file_ids:
+                    score = -2000 # Massive penalty for non-cached files
             
             # Filter out files with Hard Exclusion penalty (-1000)
             if score > -900: 
