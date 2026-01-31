@@ -24,7 +24,10 @@ class RealDebridService(DebridClient):
         magnet: str, 
         api_key: str, 
         season: Optional[int] = None, 
-        episode: Optional[int] = None
+        episode: Optional[int] = None,
+        exclude_hevc: bool = False,
+        exclude_eac3: bool = False,
+        exclude_dolby_vision: bool = False
     ) -> Optional[str]:
         """
         Resolves a Real-Debrid stream.
@@ -96,6 +99,25 @@ class RealDebridService(DebridClient):
         if not video_files:
             logger.error("No video files in RD torrent")
             return None
+
+        # Filter based on exclusions
+        if exclude_hevc or exclude_eac3 or exclude_dolby_vision:
+            filtered_files = []
+            for f in video_files:
+                path = f.get("path", "").lower()
+                if exclude_hevc and any(x in path for x in ["hevc", "h265", "x265"]):
+                    continue
+                if exclude_eac3 and any(x in path for x in ["eac3", "ddp", "dd+", "atmos"]):
+                    continue
+                if exclude_dolby_vision and any(x in path for x in ["dovi", "dv", "dolby vision", "hdr10+"]):
+                    continue
+                filtered_files.append(f)
+            
+            if filtered_files:
+                logger.info(f"Filtered {len(video_files)} files down to {len(filtered_files)} based on restrictions")
+                video_files = filtered_files
+            else:
+                logger.warning("All files filtered out by restrictions! Falling back to all files.")
 
         best_file_id = None
         

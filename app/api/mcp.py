@@ -124,7 +124,10 @@ async def handle_json_rpc(request: JsonRpcRequest):
                                         "properties": {
                                             "torbox": {"type": "string"}
                                         }
-                                    }
+                                    },
+                                    "exclude_hevc": {"type": "boolean"},
+                                    "exclude_eac3": {"type": "boolean"},
+                                    "exclude_dolby_vision": {"type": "boolean"}
                                 }
                             }
                         }
@@ -180,7 +183,7 @@ async def handle_json_rpc(request: JsonRpcRequest):
                     desperation_results = await zilean_service.search_stream(
                         title=title,
                         year=None,
-                        imdb_id=None,
+                        imdb_id=None, 
                         season=None,
                         episode=None
                     )
@@ -342,6 +345,10 @@ async def handle_json_rpc(request: JsonRpcRequest):
                 magnet = args.get("magnet") or ""
                 season = args.get("season")
                 episode = args.get("episode")
+                
+                exclude_hevc = args.get("exclude_hevc", False)
+                exclude_eac3 = args.get("exclude_eac3", False)
+                exclude_dolby_vision = args.get("exclude_dolby_vision", False)
 
                 stream_url = await debrid_service.resolve_stream(
                     source_id=source_id,
@@ -349,7 +356,10 @@ async def handle_json_rpc(request: JsonRpcRequest):
                     magnet=magnet,
                     api_key=api_key,
                     season=season,
-                    episode=episode
+                    episode=episode,
+                    exclude_hevc=exclude_hevc,
+                    exclude_eac3=exclude_eac3,
+                    exclude_dolby_vision=exclude_dolby_vision
                 )
                 
                 if stream_url:

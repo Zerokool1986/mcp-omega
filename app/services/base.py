@@ -14,7 +14,10 @@ class DebridClient(ABC):
         magnet: str, 
         api_key: str, 
         season: Optional[int] = None, 
-        episode: Optional[int] = None
+        episode: Optional[int] = None,
+        exclude_hevc: bool = False,
+        exclude_eac3: bool = False,
+        exclude_dolby_vision: bool = False
     ) -> Optional[str]:
         """
         Resolves a magnet/hash to a direct download link.
