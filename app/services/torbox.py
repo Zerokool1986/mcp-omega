@@ -3,8 +3,9 @@ import asyncio
 from loguru import logger
 from typing import Optional, Dict
 from app.core.config import settings
+from app.services.base import DebridClient
 
-class TorBoxService:
+class TorBoxService(DebridClient):
     """
     Client for TorBox.app API.
     Used to resolve info_hashes from Zilean into playable links.

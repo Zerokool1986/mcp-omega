@@ -304,16 +304,33 @@ async def handle_json_rpc(request: JsonRpcRequest):
 
             elif tool_name == "resolve":
                 # User should pass API keys via client "settings" or explicit args
-                # In VOID MCP, sensitive keys are passed in 'api_keys' map if configured.
                 api_keys = args.get("api_keys", {})
-                torbox_key = api_keys.get("torbox") or settings.TORBOX_API_KEY
+                service_name = args.get("service", "torbox").lower()
                 
-                if not torbox_key:
-                    return {
-                        "jsonrpc": "2.0", "id": req_id, 
-                        "error": {"code": -32000, "message": "Missing TorBox API Key"}
-                    }
+                # Determine Service and Key
+                debrid_service = None
+                api_key = None
                 
+                if service_name == "torbox":
+                    api_key = api_keys.get("torbox") or settings.TORBOX_API_KEY
+                    if not api_key:
+                        return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32000, "message": "Missing TorBox API Key"}}
+                    debrid_service = torbox_service
+                    
+                elif service_name == "realdebrid" or service_name == "rd":
+                    api_key = api_keys.get("real_debrid") or api_keys.get("rd")
+                    if not api_key:
+                        return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32000, "message": "Missing RealDebrid API Key"}}
+                    
+                    # Instantiate on demand or use singleton if stateless
+                    # Since base class is stateless config-wise (key passed in method), we can instantiate once.
+                    # But for now, let's lazy load.
+                    from app.services.realdebrid import RealDebridService
+                    debrid_service = RealDebridService()
+                
+                else:
+                     return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": f"Unknown service: {service_name}"}}
+
                 info_hash = args.get("info_hash")
                 if not info_hash:
                      return {
@@ -326,11 +343,11 @@ async def handle_json_rpc(request: JsonRpcRequest):
                 season = args.get("season")
                 episode = args.get("episode")
 
-                stream_url = await torbox_service.resolve_stream(
+                stream_url = await debrid_service.resolve_stream(
                     source_id=source_id,
                     info_hash=info_hash,
                     magnet=magnet,
-                    api_key=torbox_key,
+                    api_key=api_key,
                     season=season,
                     episode=episode
                 )
