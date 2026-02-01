@@ -86,13 +86,13 @@ async def handle_json_rpc(request: JsonRpcRequest):
                             {
                                 "id": "torbox",
                                 "name": "TorBox",
-                                "keyLabel": "TorBox API Key",
+                                "key_label": "TorBox API Key",
                                 "required": False
                             },
                             {
                                 "id": "realdebrid",
                                 "name": "Real-Debrid",
-                                "keyLabel": "Real-Debrid API Token",
+                                "key_label": "Real-Debrid API Token",
                                 "required": False
                             }
                         ]
