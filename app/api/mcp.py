@@ -70,18 +70,38 @@ async def handle_json_rpc(request: JsonRpcRequest):
         logger.info(f"Method: {method} | Params: {params}")
 
         if method == "initialize":
+            # Return VOID-compatible manifest with explicit service names
+            # VOID will display these exact labels in the Settings UI
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,
                 "result": {
-                    "protocolVersion": "0.1.0",
-                    "capabilities": {
-                         # We offer tools
-                        "tools": {"listChanged": True} 
-                    },
-                    "serverInfo": {
-                        "name": settings.PROJECT_NAME,
-                        "version": settings.VERSION
+                    "name": "Omega",
+                    "version": "1.0.0",
+                    "description": "Multi-source streaming provider with Zilean DMM cache",
+                    "capabilities": ["source_provider", "resolver"],
+                    "auth": {
+                        "type": "multi_key",
+                        "services": [
+                            {
+                                "id": "zilean",
+                                "name": "Zilean DMM",
+                                "keyLabel": "API URL (Optional)",
+                                "required": False
+                            },
+                            {
+                                "id": "torbox",
+                                "name": "TorBox",
+                                "keyLabel": "TorBox API Key",
+                                "required": False
+                            },
+                            {
+                                "id": "realdebrid",
+                                "name": "Real-Debrid",
+                                "keyLabel": "Real-Debrid API Token",
+                                "required": False
+                            }
+                        ]
                     }
                 }
             }
@@ -112,18 +132,20 @@ async def handle_json_rpc(request: JsonRpcRequest):
                         },
                         {
                             "name": "resolve",
-                            "description": "Resolve a stream via TorBox",
+                            "description": "Resolve a stream via TorBox or Real-Debrid",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
-                                    "source_id": {"type": "string"}, # info_hash
+                                    "source_id": {"type": "string"},
                                     "info_hash": {"type": "string"},
                                     "season": {"type": "integer"},
                                     "episode": {"type": "integer"},
-                                    "api_keys": { # Enforce passing API keys in request
+                                    "api_keys": {
                                         "type": "object",
                                         "properties": {
-                                            "torbox": {"type": "string"}
+                                            "torbox": {"type": "string"},
+                                            "realdebrid": {"type": "string"},
+                                            "zilean": {"type": "string"}
                                         }
                                     },
                                     "exclude_hevc": {"type": "boolean"},
@@ -307,33 +329,53 @@ async def handle_json_rpc(request: JsonRpcRequest):
                 }
 
             elif tool_name == "resolve":
-                # User should pass API keys via client "settings" or explicit args
+                # Get API keys from VOID client (passed via manifest)
                 api_keys = args.get("api_keys", {})
-                service_name = args.get("service", "torbox").lower()
                 
-                # Determine Service and Key
+                # Auto-detect which service to use based on available keys
+                # Priority: torbox > realdebrid
                 debrid_service = None
                 api_key = None
+                service_used = None
                 
-                if service_name == "torbox":
-                    api_key = api_keys.get("torbox") or settings.TORBOX_API_KEY
-                    if not api_key:
-                        return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32000, "message": "Missing TorBox API Key"}}
+                # Check TorBox
+                if api_keys.get("torbox"):
+                    api_key = api_keys["torbox"]
                     debrid_service = torbox_service
+                    service_used = "TorBox"
+                    logger.info("Using TorBox for resolution")
                     
-                elif service_name == "realdebrid" or service_name == "rd":
-                    api_key = api_keys.get("real_debrid") or api_keys.get("rd")
-                    if not api_key:
-                        return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32000, "message": "Missing RealDebrid API Key"}}
-                    
-                    # Instantiate on demand or use singleton if stateless
-                    # Since base class is stateless config-wise (key passed in method), we can instantiate once.
-                    # But for now, let's lazy load.
+                # Check Real-Debrid
+                elif api_keys.get("realdebrid"):
+                    api_key = api_keys["realdebrid"]
                     from app.services.realdebrid import RealDebridService
                     debrid_service = RealDebridService()
+                    service_used = "Real-Debrid"
+                    logger.info("Using Real-Debrid for resolution")
+                    
+                # Fallback to env vars (local testing only)
+                elif settings.TORBOX_API_KEY:
+                    api_key = settings.TORBOX_API_KEY
+                    debrid_service = torbox_service
+                    service_used = "TorBox (env)"
+                    logger.info("Using fallback TorBox key from environment")
+                    
+                elif settings.REALDEBRID_API_KEY:
+                    api_key = settings.REALDEBRID_API_KEY
+                    from app.services.realdebrid import RealDebridService
+                    debrid_service = RealDebridService()
+                    service_used = "Real-Debrid (env)"
+                    logger.info("Using fallback Real-Debrid key from environment")
                 
-                else:
-                     return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32602, "message": f"Unknown service: {service_name}"}}
+                if not debrid_service or not api_key:
+                    return {
+                        "jsonrpc": "2.0", 
+                        "id": req_id, 
+                        "error": {
+                            "code": -32000, 
+                            "message": "No API keys configured. Please add TorBox or Real-Debrid API key in VOID Settings → MCP Settings → Omega."
+                        }
+                    }
 
                 info_hash = args.get("info_hash")
                 if not info_hash:
