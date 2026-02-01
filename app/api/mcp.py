@@ -78,17 +78,11 @@ async def handle_json_rpc(request: JsonRpcRequest):
                 "result": {
                     "name": "Omega",
                     "version": "1.0.0",
-                    "description": "Multi-source streaming provider with Zilean DMM cache",
+                    "description": "Multi-source provider with automatic Zilean DMM cache search",
                     "capabilities": ["source_provider", "resolver"],
                     "auth": {
                         "type": "multi_key",
                         "services": [
-                            {
-                                "id": "zilean",
-                                "name": "Zilean DMM",
-                                "keyLabel": "API URL (Optional)",
-                                "required": False
-                            },
                             {
                                 "id": "torbox",
                                 "name": "TorBox",
@@ -144,8 +138,7 @@ async def handle_json_rpc(request: JsonRpcRequest):
                                         "type": "object",
                                         "properties": {
                                             "torbox": {"type": "string"},
-                                            "realdebrid": {"type": "string"},
-                                            "zilean": {"type": "string"}
+                                            "realdebrid": {"type": "string"}
                                         }
                                     },
                                     "exclude_hevc": {"type": "boolean"},
