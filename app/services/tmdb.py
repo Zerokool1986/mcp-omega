@@ -5,9 +5,8 @@ from async_lru import alru_cache
 
 class TMDBService:
     def __init__(self, api_key: str = None):
-        # TMDB API key - will be configured by client or fall back to a default
-        # For now, using a placeholder that should be replaced with a valid key
-        self.api_key = api_key or "8d6d91941230817f7807d643736e8a49"  # Public demo key
+        # TMDB API key - same one used by the Android app
+        self.api_key = api_key or "16b81f36be6daedcf9500e2154e4cd4f"
         self.base_url = "https://api.themoviedb.org/3"
         self.client = httpx.AsyncClient(timeout=10.0)
 

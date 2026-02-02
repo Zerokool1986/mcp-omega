@@ -178,7 +178,11 @@ async def handle_json_rpc(request: JsonRpcRequest):
                                     },
                                     "trakt_token": {
                                         "type": "string",
-                                        "description": "User's Trakt OAuth access token for personalized queries."
+                                        "description": "Trakt access token for personalized features"
+                                    },
+                                    "tmdb_api_key": {
+                                        "type": "string",
+                                        "description": "TMDB API key for metadata lookups"
                                     }
                                 },
                                 "required": ["query"]
@@ -457,8 +461,9 @@ async def handle_json_rpc(request: JsonRpcRequest):
                 api_key = args.get("api_key")
                 user_context = args.get("user_context")
                 trakt_token = args.get("trakt_token")
+                tmdb_api_key = args.get("tmdb_api_key")
                 
-                response_text = await vector_service.chat(query, history, api_key, user_context, trakt_token)
+                response_text = await vector_service.chat(query, history, api_key, user_context, trakt_token, tmdb_api_key)
                 
                 return {
                     "jsonrpc": "2.0",

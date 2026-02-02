@@ -35,7 +35,7 @@ class VectorService:
              await self.provider.configure(final_key)
              self.initialized = True
 
-    async def chat(self, query: str, history: List[Dict[str, str]] = [], api_key: Optional[str] = None, user_context: Optional[str] = None, trakt_token: Optional[str] = None) -> str:
+    async def chat(self, query: str, history: List[Dict[str, str]] = [], api_key: Optional[str] = None, user_context: Optional[str] = None, trakt_token: Optional[str] = None, tmdb_api_key: Optional[str] = None) -> str:
         """
         Process a chat query using the LLM Provider and available tools.
         """
@@ -160,10 +160,14 @@ class VectorService:
                     logger.info(f"Executing tmdb_search: {query} (type={content_type})")
                     
                     try:
+                        # Use client's TMDB API key if provided, otherwise fall back to default
+                        from app.services.tmdb import TMDBService
+                        tmdb = TMDBService(api_key=tmdb_api_key)
+                        
                         if content_type == "show":
-                            result = await tmdb_service.search_show(query)
+                            result = await tmdb.search_show(query)
                         else:
-                            result = await tmdb_service.search_movie(query)
+                            result = await tmdb.search_movie(query)
                         
                         if result:
                             tool_outputs.append({
