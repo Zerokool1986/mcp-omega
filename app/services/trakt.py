@@ -35,27 +35,59 @@ class TraktService:
     
     async def get_history(self, limit: int = 100, item_type: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        Get user's watch history.
-        item_type: 'movies', 'shows', 'seasons', 'episodes' (or None for all)
+        Get user's watched content (completed items).
+        This uses /watched endpoints instead of /history for better permission compatibility.
+        Returns a combined list of watched shows and movies.
         """
-        url = f"{self.BASE_URL}/users/me/history"
-        if item_type:
-            url += f"/{item_type}"
+        results = []
         
         async with httpx.AsyncClient() as client:
-            response = await client.get(
-                url,
-                headers=self.headers,
-                params={"limit": limit},
-                timeout=10.0
-            )
-            response.raise_for_status()
-            return response.json()
+            # Get watched movies
+            if item_type in [None, "movies", "movie"]:
+                try:
+                    response = await client.get(
+                        f"{self.BASE_URL}/users/me/watched/movies",
+                        headers=self.headers,
+                        timeout=10.0
+                    )
+                    response.raise_for_status()
+                    movies = response.json()
+                    for movie in movies[:limit]:
+                        results.append({
+                            "type": "movie",
+                            "movie": movie.get("movie", {}),
+                            "plays": movie.get("plays", 1),
+                            "last_watched_at": movie.get("last_watched_at")
+                        })
+                except Exception as e:
+                    logger.error(f"Error fetching watched movies: {e}")
+            
+            # Get watched shows (returns show-level data, not episodes)
+            if item_type in [None, "shows", "show"]:
+                try:
+                    response = await client.get(
+                        f"{self.BASE_URL}/users/me/watched/shows",
+                        headers=self.headers,
+                        timeout=10.0
+                    )
+                    response.raise_for_status()
+                    shows = response.json()
+                    for show in shows[:limit]:
+                        results.append({
+                            "type": "show",
+                            "show": show.get("show", {}),
+                            "plays": show.get("plays", 1),
+                            "last_watched_at": show.get("last_watched_at")
+                        })
+                except Exception as e:
+                    logger.error(f"Error fetching watched shows: {e}")
+        
+        return results[:limit]
     
     async def search_history(self, title: str) -> List[Dict[str, Any]]:
         """
-        Search the user's entire history for a specific title.
-        Useful for questions like "Did I watch Inception?"
+        Search the user's watched content for a specific title.
+        Uses /watched endpoints instead of /history for compatibility.
         """
         history = await self.get_history(limit=1000)  # Get large sample
         results = []
@@ -66,7 +98,7 @@ class TraktService:
                 movie_title = item.get("movie", {}).get("title", "").lower()
                 if title_lower in movie_title:
                     results.append(item)
-            elif item.get("type") == "episode":
+            elif item.get("type") == "show":
                 show_title = item.get("show", {}).get("title", "").lower()
                 if title_lower in show_title:
                     results.append(item)
