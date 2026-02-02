@@ -13,8 +13,8 @@ class GeminiProvider(LLMProvider):
             logger.warning("Gemini Provider initialized without API Key")
             return
         genai.configure(api_key=api_key)
-        # Use Flash 1.5 for speed/cost efficiency
-        self.model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        # Use Flash 3 Preview for best performance/speed
+        self.model = genai.GenerativeModel('gemini-3-flash-preview')
 
     async def complete(
         self, 
@@ -60,7 +60,7 @@ class GeminiProvider(LLMProvider):
             if gemini_tools:
                 # Re-instantiate model with tools if needed
                 chat = genai.GenerativeModel(
-                    'gemini-1.5-flash', 
+                    'gemini-3-flash-preview', 
                     tools=[gemini_tools]
                 ).start_chat(history=gemini_history)
 
