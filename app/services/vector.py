@@ -6,7 +6,7 @@ from app.services.llm.provider import LLMProvider
 
 # Import tools for direct execution
 # In a larger system, we'd have a ToolRegistry
-from app.api.mcp import zilean_service, torbox_service 
+# from app.api.mcp import zilean_service, torbox_service 
 # Wait, we can't import `mcp` here easily due to circular deps if mcp imports vector.
 # Better to pass tool execution context or have a dedicated registry.
 # For now, let's re-import services directly or use a registry pattern.
