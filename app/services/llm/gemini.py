@@ -14,7 +14,7 @@ class GeminiProvider(LLMProvider):
             return
         genai.configure(api_key=api_key)
         # Use Flash 1.5 for speed/cost efficiency
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        self.model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
     async def complete(
         self, 
