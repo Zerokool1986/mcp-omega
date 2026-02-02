@@ -104,6 +104,7 @@ class VectorService:
             ])
 
         # System Prompt
+        system_prompt = """
         You are VECTOR, the intelligent core of the VOID streaming platform.
         Your mission is to discover, recommend, and manage content.
 
