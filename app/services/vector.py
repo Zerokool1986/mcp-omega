@@ -15,6 +15,7 @@ from app.api.mcp import zilean_service, torbox_service
 from app.services.zilean import zilean_service
 from app.services.torbox import torbox_service
 from app.services.trakt import create_trakt_service
+from app.services.tmdb import tmdb_service
 
 class VectorService:
     def __init__(self):
@@ -42,21 +43,32 @@ class VectorService:
 
         # Define Available Tools (Schema)
         # This mirrors what we send in 'tools/list' but is internal for the LLM prompt
+        # Tools available to the AI
         tools_schema = [
             {
-                "name": "search",
-                "description": "Search for movies or shows. Input query can be a title like 'Dune' or specific like 'Severance S01E01'.",
+                "name": "tmdb_search",
+                "description": "Search TMDB to get accurate TMDB IDs for movies or TV shows. ALWAYS use this for recommendations!",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "Title of the content"},
-                        "type": {"type": "string", "enum": ["movie", "show"], "description": "Media type if known"},
-                        "season": {"type": "integer"},
-                        "episode": {"type": "integer"}
+                        "query": {"type": "string", "description": "Title to search for"},
+                        "type": {"type": "string", "enum": ["movie", "show"], "description": "Content type"}
+                    },
+                    "required": ["query", "type"]
+                }
+            },
+            {
+                "name": "search",
+                "description": "Search for streams. Use only if you need to find available torrents.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string"},
+                        "type": {"type": "string", "enum": ["movie", "show"]}
                     },
                     "required": ["query"]
                 }
-            },
+            }
         ]
         
         # Add Trakt tools if token is available
@@ -98,13 +110,16 @@ class VectorService:
         CRITICAL RULE - DEEP LINKING:
         When recommending content, you MUST provide clickable deep links.
         
-        1. Use your knowledge to provide accurate TMDB IDs for movies and TV shows.
+        1. ALWAYS use the 'tmdb_search' tool to get accurate TMDB IDs for ANY content you recommend.
         2. Format links as: [Title](void://<type>/<tmdb_id>) where type is 'movie' or 'show'.
-        3. Examples:
-           - [The Orville](void://show/71738)
-           - [Resident Alien](void://show/90160)
-           - [Dune](void://movie/438631)
-        4. If you're unsure about a TMDB ID, you can use the 'search' tool, but prefer using your knowledge.
+        3. NEVER guess or use your knowledge for TMDB IDs - only use IDs returned by tmdb_search.
+        4. Limit tmdb_search calls to 3-4 titles per response to avoid overwhelming the system.
+        
+        Example workflow:
+        - User asks: "Recommend a sci-fi show"
+        - You call: tmdb_search(query="The Expanse", type="show")
+        - Tool returns: {"tmdb_id": 63639, "title": "The Expanse", ...}
+        - You respond: "I recommend [The Expanse](void://show/63639)..."
         
         Always provide these links for recommendations so users can immediately access content.
         """
@@ -137,7 +152,37 @@ class VectorService:
             tool_outputs = []
             
             for tool in response.tool_calls:
-                if tool.name == "search":
+                if tool.name == "tmdb_search":
+                    # Execute TMDB Search
+                    args = tool.arguments
+                    query = args.get("query")
+                    content_type = args.get("type", "show")
+                    logger.info(f"Executing tmdb_search: {query} (type={content_type})")
+                    
+                    try:
+                        if content_type == "show":
+                            result = await tmdb_service.search_show(query)
+                        else:
+                            result = await tmdb_service.search_movie(query)
+                        
+                        if result:
+                            tool_outputs.append({
+                                "tool": "tmdb_search",
+                                "result": f"TMDB ID: {result['tmdb_id']}, Title: {result['title']}, Year: {result.get('year', 'N/A')}"
+                            })
+                        else:
+                            tool_outputs.append({
+                                "tool": "tmdb_search",
+                                "result": f"No results found for '{query}'"
+                            })
+                    except Exception as e:
+                        logger.error(f"TMDB search error: {e}")
+                        tool_outputs.append({
+                            "tool": "tmdb_search",
+                            "result": f"Error searching TMDB: {str(e)}"
+                        })
+                
+                elif tool.name == "search":
                     # Execute Search
                     args = tool.arguments
                     logger.info(f"Executing Search: {args}")
