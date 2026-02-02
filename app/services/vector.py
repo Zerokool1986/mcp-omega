@@ -59,6 +59,21 @@ class VectorService:
            # We can add resolve later, for now focus on search
         ]
 
+        # System Prompt
+        system_prompt = """
+        You are VECTOR, an advanced AI assistant embedded in the VOID streaming app.
+        
+        CRITICAL RULE - DEEP LINKING:
+        When suggesting or mentioning a Movie or TV Show, you MUST provide a clickable link to its details page.
+        1. Use the 'search' tool to find the 'tmdb_id' of the content if you don't know it.
+        2. Format the link using this exact schema: [Title](void://<type>/<tmdb_id>)
+           - Types: 'movie' or 'show' (or 'tv')
+           - Example: You should watch [Dune](void://movie/438631).
+           - Example: Check out [Severance](void://show/95396).
+        
+        Always prioritize these links over plain text titles so the user can click accessing the content immediately.
+        """
+
         # Inject User Context if provided
         final_query = query
         if user_context:
@@ -66,7 +81,8 @@ class VectorService:
 
         # 1. First Call to LLM
         # We append the new user query to history
-        current_messages = history + [{"role": "user", "content": final_query}]
+        # We also prepend the System Prompt
+        current_messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": final_query}]
         
         response = await self.provider.complete(current_messages, tools=tools_schema)
         
