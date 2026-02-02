@@ -366,51 +366,36 @@ async def handle_json_rpc(request: JsonRpcRequest):
                 # Get API keys from VOID client (passed via manifest)
                 api_keys = args.get("api_keys", {})
                 
-                # Auto-detect which service to use based on available keys
-                # Priority: torbox > realdebrid
-                debrid_service = None
-                api_key = None
-                service_used = None
+                # Smart Fallback Logic
+                # Priority: Real-Debrid > TorBox
+                # We try services in order. If one fails (returns None), we try the next.
                 
-                # Check TorBox
-                if api_keys.get("torbox"):
-                    api_key = api_keys["torbox"]
-                    debrid_service = torbox_service
-                    service_used = "TorBox"
-                    logger.info("Using TorBox for resolution")
-                    
-                # Check Real-Debrid
-                elif api_keys.get("realdebrid"):
-                    api_key = api_keys["realdebrid"]
+                services_to_try = []
+
+                # 1. Real-Debrid (Preferred for Cache)
+                if api_keys.get("realdebrid") or settings.REALDEBRID_API_KEY:
+                    rd_key = api_keys.get("realdebrid") or settings.REALDEBRID_API_KEY
                     from app.services.realdebrid import RealDebridService
-                    debrid_service = RealDebridService()
-                    service_used = "Real-Debrid"
-                    logger.info("Using Real-Debrid for resolution")
-                    
-                # Fallback to env vars (local testing only)
-                elif settings.TORBOX_API_KEY:
-                    api_key = settings.TORBOX_API_KEY
-                    debrid_service = torbox_service
-                    service_used = "TorBox (env)"
-                    logger.info("Using fallback TorBox key from environment")
-                    
-                elif settings.REALDEBRID_API_KEY:
-                    api_key = settings.REALDEBRID_API_KEY
-                    from app.services.realdebrid import RealDebridService
-                    debrid_service = RealDebridService()
-                    service_used = "Real-Debrid (env)"
-                    logger.info("Using fallback Real-Debrid key from environment")
-                
-                if not debrid_service or not api_key:
+                    services_to_try.append(("Real-Debrid", RealDebridService(), rd_key))
+
+                # 2. TorBox (Fallback)
+                if api_keys.get("torbox") or settings.TORBOX_API_KEY:
+                    tb_key = api_keys.get("torbox") or settings.TORBOX_API_KEY
+                    services_to_try.append(("TorBox", torbox_service, tb_key))
+
+                if not services_to_try:
                     return {
                         "jsonrpc": "2.0", 
                         "id": req_id, 
                         "error": {
                             "code": -32000, 
-                            "message": "No API keys configured. Please add TorBox or Real-Debrid API key in VOID Settings → MCP Settings → Omega."
+                            "message": "No API keys configured. Please add Real-Debrid or TorBox API key in VOID Settings."
                         }
                     }
 
+                stream_url = None
+                service_used = None
+                
                 info_hash = args.get("info_hash")
                 if not info_hash:
                      return {
@@ -427,17 +412,31 @@ async def handle_json_rpc(request: JsonRpcRequest):
                 exclude_eac3 = args.get("exclude_eac3", False)
                 exclude_dolby_vision = args.get("exclude_dolby_vision", False)
 
-                stream_url = await debrid_service.resolve_stream(
-                    source_id=source_id,
-                    info_hash=info_hash,
-                    magnet=magnet,
-                    api_key=api_key,
-                    season=season,
-                    episode=episode,
-                    exclude_hevc=exclude_hevc,
-                    exclude_eac3=exclude_eac3,
-                    exclude_dolby_vision=exclude_dolby_vision
-                )
+                for name, service, key in services_to_try:
+                    logger.info(f"Attempting resolution with {name}...")
+                    try:
+                        stream_url = await service.resolve_stream(
+                            source_id=source_id,
+                            info_hash=info_hash,
+                            magnet=magnet,
+                            api_key=key,
+                            season=season,
+                            episode=episode,
+                            exclude_hevc=exclude_hevc,
+                            exclude_eac3=exclude_eac3,
+                            exclude_dolby_vision=exclude_dolby_vision
+                        )
+                        
+                        if stream_url:
+                            service_used = name
+                            logger.info(f"Successfully resolved with {name}")
+                            break
+                        else:
+                            logger.warning(f"{name} could not resolve stream (not cached or error).")
+                            
+                    except Exception as e:
+                        logger.error(f"{name} resolution error: {e}")
+                        # Continue to next service
                 
                 if stream_url:
                      return {
