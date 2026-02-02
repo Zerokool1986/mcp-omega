@@ -117,15 +117,11 @@ class VectorService:
         You MUST enable one-click playback for every movie or TV show you mention.
 
         **Execution Chain:**
-        1. **Ideate**: Use your internal knowledge to suggest titles based on user requests (e.g., "Australian Reno Shows").
+        1. **Ideate**: Use your internal knowledge to suggest titles based on user requests.
         2. **Verify**: CALL `tmdb_search(query=Title, type=media_type)` to get the official TMDB ID for each suggestion.
         3. **Link**: RENDER the link as: `[Title](void://<type>/<tmdb_id>)`.
 
-        **Constraints:**
-        - **NO HALLUCINATED IDS**: You MUST use `tmdb_search` to get the actual ID. Do not guess the ID.
-        - **NO DEAD LINKS**: If search fails, mentioning the title without a link is acceptable.
-        - **BATCHING**: Limit tool calls to 3-5 items per response.
-        - **NO APOLOGIES**: Never apologize for capabilities. If you can't find something, suggest an alternative.
+        **CRITICAL:** You MUST verify every link with `tmdb_search` to ensure the ID is correct. Do not guess IDs.
         """
 
         # Inject User Context if provided
