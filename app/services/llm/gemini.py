@@ -25,7 +25,6 @@ class GeminiProvider(LLMProvider):
             return LLMResponse(content="Error: Gemini AI not configured. Please set GEMINI_API_KEY in server environment.")
 
         # Convert conversation history to Gemini format
-        # Gemini expects "user" and "model" roles
         gemini_history = []
         for msg in messages:
             role = "user" if msg["role"] == "user" else "model"
@@ -39,36 +38,15 @@ class GeminiProvider(LLMProvider):
             prompt = "Hello" # Fallback
 
         # Convert Tools to Gemini Function Declarations
-        gemini_tools = []
+        gemini_tools = None
         if tools:
-            # We need to map generic JSON Schema to Gemini's expected format
-            # Fortunately, Gemini supports JSON Schema-like dicts
-            # We wrap them in a Tool object
-            # Note: For simplicity in this iteration, we might pass tools directly if supported,
-            # or we need to construct FunctionDeclaration objects.
-            
-            # Using the simpler "tools" argument in generate_content which accepts list of functions
-            # But we have JSON definitions.
-            # We'll need to define python functions or construct `genai.types.FunctionDeclaration`
-            pass 
-            # TODO: Implement full schema mapping. 
-            # For this MVP step, we will rely on text-based tool prompting if schema mapping fails, 
-            # OR we assume 'tools' contains valid FunctionDeclarations.
-            
-            # Revisit: For now, let's keep it simple. 
-            # We will use system prompt instructions for tool usage in this first pass 
-            # to avoid complex schema translation code, OR strictly map if we have time.
-            # Let's try basic schema mapping.
-
             formatted_tools = []
             for t in tools:
-                 # Check if we can construct function declaration
-                 # simplistic mapping
-                 formatted_tools.append(
+                formatted_tools.append(
                      content.FunctionDeclaration(
                          name=t["name"],
                          description=t["description"],
-                         parameters=t["inputSchema"]
+                         parameters=self._map_schema(t["inputSchema"])
                      )
                  )
             
@@ -79,13 +57,8 @@ class GeminiProvider(LLMProvider):
             chat = self.model.start_chat(history=gemini_history)
             
             # Send message
-            # If tools are present, we pass them.
-            # Note: start_chat doesn't accept tools easily in 1.0, 
-            # we might need to recreate model with tools=...
-            
             if gemini_tools:
-                # Re-instantiate model with tools if needed, or use generate_content
-                # ChatSession binding is preferred.
+                # Re-instantiate model with tools if needed
                 chat = genai.GenerativeModel(
                     'gemini-1.5-flash', 
                     tools=[gemini_tools]
@@ -103,7 +76,7 @@ class GeminiProvider(LLMProvider):
                 if part.function_call:
                     fc = part.function_call
                     # Convert args to dict protocol
-                    args = dict(fc.args.items()) # generic proto map to dict
+                    args = dict(fc.args.items()) 
                     tool_calls.append(ToolCall(name=fc.name, arguments=args))
 
             return LLMResponse(content=text_content, tool_calls=tool_calls)
@@ -111,3 +84,31 @@ class GeminiProvider(LLMProvider):
         except Exception as e:
             logger.error(f"Gemini Error: {e}")
             return LLMResponse(content=f"Error connecting to AI: {str(e)}")
+
+    def _map_schema(self, schema: Dict[str, Any]) -> content.Schema:
+        """Converts a standard JSON Schema dict to a Gemini content.Schema object."""
+        type_str = schema.get("type", "string").lower()
+        
+        type_map = {
+            "string": content.Type.STRING,
+            "number": content.Type.NUMBER, 
+            "integer": content.Type.INTEGER,
+            "boolean": content.Type.BOOLEAN,
+            "array": content.Type.ARRAY,
+            "object": content.Type.OBJECT
+        }
+        
+        gemini_type = type_map.get(type_str, content.Type.STRING)
+        
+        properties = {}
+        if "properties" in schema:
+            for key, prop_schema in schema["properties"].items():
+                properties[key] = self._map_schema(prop_schema)
+                
+        return content.Schema(
+            type=gemini_type,
+            description=schema.get("description"),
+            properties=properties or None,
+            required=schema.get("required"),
+            enum=schema.get("enum")
+        )
