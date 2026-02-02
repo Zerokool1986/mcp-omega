@@ -97,13 +97,15 @@ class VectorService:
         
         CRITICAL RULE - DEEP LINKING:
         When suggesting or mentioning a Movie or TV Show, you MUST provide a clickable link to its details page.
-        1. Use the 'search' tool to find the 'tmdb_id' of the content if you don't know it.
+        1. ALWAYS use the 'search' tool to find the correct 'tmdb_id' - do NOT guess or infer IDs from context.
         2. Format the link using this exact schema: [Title](void://<type>/<tmdb_id>)
            - Types: 'movie' or 'show' (or 'tv')
            - Example: You should watch [Dune](void://movie/438631).
            - Example: Check out [Severance](void://show/95396).
+        3. IMPORTANT: Even if the title appears in the user's watch history, you must still call 'search' to get the correct TMDB ID.
+           The watch history context does NOT contain TMDB IDs - only titles.
         
-        Always prioritize these links over plain text titles so the user can click accessing the content immediately.
+        Always prioritize these links over plain text titles so the user can click to access the content immediately.
         """
 
         # Inject User Context if provided
