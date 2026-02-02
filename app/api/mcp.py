@@ -95,6 +95,12 @@ async def handle_json_rpc(request: JsonRpcRequest):
                                 "name": "Real-Debrid",
                                 "key_label": "Real-Debrid API Token",
                                 "required": False
+                            },
+                            {
+                                "id": "gemini",
+                                "name": "Google Gemini",
+                                "key_label": "Gemini API Key",
+                                "required": False
                             }
                         ]
                     }
@@ -439,8 +445,9 @@ async def handle_json_rpc(request: JsonRpcRequest):
             elif tool_name == "vector_chat":
                 query = args.get("query")
                 history = args.get("history", [])
+                api_key = args.get("api_key")
                 
-                response_text = await vector_service.chat(query, history)
+                response_text = await vector_service.chat(query, history, api_key)
                 
                 return {
                     "jsonrpc": "2.0",

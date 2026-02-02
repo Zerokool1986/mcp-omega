@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     TORBOX_API_KEY: Optional[str] = None
     REALDEBRID_API_KEY: Optional[str] = None
     
+    # Tier 3: AI Brain
+    GEMINI_API_KEY: Optional[str] = None
+    
     class Config:
         env_file = ".env"
 
