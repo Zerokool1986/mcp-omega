@@ -17,7 +17,7 @@ class TorBoxService(DebridClient):
     async def _get_headers(self, api_key: str) -> Dict[str, str]:
         return {"Authorization": f"Bearer {api_key}"}
 
-    async def resolve_stream(self, source_id: str, info_hash: str, magnet: str, api_key: str, season: Optional[int] = None, episode: Optional[int] = None) -> Optional[str]:
+    async def resolve_stream(self, source_id: str, info_hash: str, magnet: str, api_key: str, season: Optional[int] = None, episode: Optional[int] = None, exclude_hevc: bool = False, exclude_eac3: bool = False, exclude_dolby_vision: bool = False) -> Optional[str]:
         """
         Resolves a stream from TorBox by adding the magnet and selecting the correct file.
         """
