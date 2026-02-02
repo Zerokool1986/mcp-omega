@@ -9,6 +9,7 @@ from app.utils.parser import VideoParser
 
 from app.services.zilean import zilean_service
 from app.services.torbox import torbox_service
+from app.services.vector import vector_service
 from app.core.config import settings
 
 router = APIRouter()
@@ -145,6 +146,27 @@ async def handle_json_rpc(request: JsonRpcRequest):
                                     "exclude_eac3": {"type": "boolean"},
                                     "exclude_dolby_vision": {"type": "boolean"}
                                 }
+                            }
+                        },
+                        {
+                            "name": "vector_chat",
+                            "description": "Chat with the VECTOR AI Agent",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "query": {"type": "string"},
+                                    "history": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "role": {"type": "string"},
+                                                "content": {"type": "string"}
+                                            }
+                                        }
+                                    }
+                                },
+                                "required": ["query"]
                             }
                         }
                     ]
@@ -413,6 +435,22 @@ async def handle_json_rpc(request: JsonRpcRequest):
                         "jsonrpc": "2.0", "id": req_id, 
                         "error": {"code": -32001, "message": "Failed to resolve stream"}
                     }
+
+            elif tool_name == "vector_chat":
+                query = args.get("query")
+                history = args.get("history", [])
+                
+                response_text = await vector_service.chat(query, history)
+                
+                return {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "result": {
+                        "content": [
+                            {"type": "text", "text": response_text}
+                        ]
+                    }
+                }
 
         return JSONResponse(
             status_code=404, 
