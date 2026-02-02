@@ -5,10 +5,13 @@ from loguru import logger
 class TraktService:
     """
     Server-side Trakt API client using user's OAuth token.
+    IMPORTANT: This CLIENT_ID must match the Android app's CLIENT_ID because
+    the access token was issued to that client. Using a different CLIENT_ID
+    will result in 403 Forbidden errors.
     """
     
     BASE_URL = "https://api.trakt.tv"
-    CLIENT_ID = "d82b02e4d13047a3e939301cd77f8d0799fa19fb0de1129db7ba93be58cf8be3"
+    CLIENT_ID = "006574af3390f43c53f5db3a430ba8e08e91632c3ed23f29f7e842ec48644dfd"  # Android app's CLIENT_ID
     
     def __init__(self, access_token: str):
         self.access_token = access_token
