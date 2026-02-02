@@ -33,7 +33,7 @@ class VectorService:
              await self.provider.configure(final_key)
              self.initialized = True
 
-    async def chat(self, query: str, history: List[Dict[str, str]] = [], api_key: Optional[str] = None) -> str:
+    async def chat(self, query: str, history: List[Dict[str, str]] = [], api_key: Optional[str] = None, user_context: Optional[str] = None) -> str:
         """
         Process a chat query using the LLM Provider and available tools.
         """
@@ -59,9 +59,14 @@ class VectorService:
            # We can add resolve later, for now focus on search
         ]
 
+        # Inject User Context if provided
+        final_query = query
+        if user_context:
+            final_query = f"{query}\n\n[Active User Context]\n{user_context}"
+
         # 1. First Call to LLM
         # We append the new user query to history
-        current_messages = history + [{"role": "user", "content": query}]
+        current_messages = history + [{"role": "user", "content": final_query}]
         
         response = await self.provider.complete(current_messages, tools=tools_schema)
         

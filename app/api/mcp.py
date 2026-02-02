@@ -170,6 +170,11 @@ async def handle_json_rpc(request: JsonRpcRequest):
                                                 "content": {"type": "string"}
                                             }
                                         }
+                                    },
+                                    "api_key": {"type": "string"},
+                                    "user_context": {
+                                        "type": "string",
+                                        "description": "Additional context (e.g. watch history) to inform the AI."
                                     }
                                 },
                                 "required": ["query"]
@@ -446,8 +451,9 @@ async def handle_json_rpc(request: JsonRpcRequest):
                 query = args.get("query")
                 history = args.get("history", [])
                 api_key = args.get("api_key")
+                user_context = args.get("user_context")
                 
-                response_text = await vector_service.chat(query, history, api_key)
+                response_text = await vector_service.chat(query, history, api_key, user_context)
                 
                 return {
                     "jsonrpc": "2.0",
