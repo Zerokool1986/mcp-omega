@@ -14,6 +14,7 @@ from app.api.mcp import zilean_service, torbox_service
 
 from app.services.zilean import zilean_service
 from app.services.torbox import torbox_service
+from app.services.trakt import create_trakt_service
 
 class VectorService:
     def __init__(self):
@@ -33,7 +34,7 @@ class VectorService:
              await self.provider.configure(final_key)
              self.initialized = True
 
-    async def chat(self, query: str, history: List[Dict[str, str]] = [], api_key: Optional[str] = None, user_context: Optional[str] = None) -> str:
+    async def chat(self, query: str, history: List[Dict[str, str]] = [], api_key: Optional[str] = None, user_context: Optional[str] = None, trakt_token: Optional[str] = None) -> str:
         """
         Process a chat query using the LLM Provider and available tools.
         """
@@ -44,7 +45,7 @@ class VectorService:
         tools_schema = [
             {
                 "name": "search",
-                "description": "Search for movies or displays. Input query can be a title like 'Dune' or specific like 'Severance S01E01'.",
+                "description": "Search for movies or shows. Input query can be a title like 'Dune' or specific like 'Severance S01E01'.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -56,8 +57,39 @@ class VectorService:
                     "required": ["query"]
                 }
             },
-           # We can add resolve later, for now focus on search
         ]
+        
+        # Add Trakt tools if token is available
+        if trakt_token:
+            tools_schema.extend([
+                {
+                    "name": "trakt_stats",
+                    "description": "Get the user's Trakt watching statistics (total episodes, movies, time spent, etc.)",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                },
+                {
+                    "name": "trakt_history_search",
+                    "description": "Search the user's entire watch history for a specific title. Useful for 'Did I watch X?' questions.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "title": {"type": "string", "description": "Title to search for"}
+                        },
+                        "required": ["title"]
+                    }
+                },
+                {
+                    "name": "trakt_continue_watching",
+                    "description": "Get shows/movies the user is currently watching (Continue Watching list)",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            ])
 
         # System Prompt
         system_prompt = """
@@ -109,7 +141,6 @@ class VectorService:
                     
                     q = args.get("query")
                     t = args.get("type", "movie")
-                    pass
                     
                     # Call Zilean (Reusing logic from mcp.py would be ideal, but for now duplicate/call service directly)
                     # Simple title search for now
@@ -121,6 +152,58 @@ class VectorService:
                         "tool": "search",
                         "result": f"Found {len(results)} results. Top 5: {', '.join(summary)}"
                     })
+                
+                elif tool.name == "trakt_stats" and trakt_token:
+                    logger.info("Executing trakt_stats")
+                    trakt = create_trakt_service(trakt_token)
+                    try:
+                        stats = await trakt.get_watching_stats()
+                        # Format stats for AI
+                        movies_watched = stats.get("movies", {}).get("watched", 0)
+                        episodes_watched = stats.get("episodes", {}).get("watched", 0)
+                        minutes_watched = stats.get("minutes", 0)
+                        hours = minutes_watched // 60
+                        
+                        result_text = f"User has watched {movies_watched} movies and {episodes_watched} episodes. Total time: {hours} hours."
+                        tool_outputs.append({"tool": "trakt_stats", "result": result_text})
+                    except Exception as e:
+                        logger.error(f"Trakt stats error: {e}")
+                        tool_outputs.append({"tool": "trakt_stats", "result": f"Error fetching stats: {str(e)}"})
+                
+                elif tool.name == "trakt_history_search" and trakt_token:
+                    args = tool.arguments
+                    title = args.get("title", "")
+                    logger.info(f"Executing trakt_history_search for: {title}")
+                    
+                    trakt = create_trakt_service(trakt_token)
+                    try:
+                        results = await trakt.search_history(title)
+                        if results:
+                            result_text = f"Yes, user watched '{title}'. Found {len(results)} occurrences in history."
+                        else:
+                            result_text = f"No, user has not watched '{title}'."
+                        tool_outputs.append({"tool": "trakt_history_search", "result": result_text})
+                    except Exception as e:
+                        logger.error(f"Trakt history search error: {e}")
+                        tool_outputs.append({"tool": "trakt_history_search", "result": f"Error searching history: {str(e)}"})
+                
+                elif tool.name == "trakt_continue_watching" and trakt_token:
+                    logger.info("Executing trakt_continue_watching")
+                    trakt = create_trakt_service(trakt_token)
+                    try:
+                        items = await trakt.get_continue_watching()
+                        if items:
+                            summaries = []
+                            for item in items[:5]:  # Top 5
+                                title = item.get("show", {}).get("title") or item.get("movie", {}).get("title", "Unknown")
+                                summaries.append(title)
+                            result_text = f"User is currently watching: {', '.join(summaries)}"
+                        else:
+                            result_text = "No shows currently in progress."
+                        tool_outputs.append({"tool": "trakt_continue_watching", "result": result_text})
+                    except Exception as e:
+                        logger.error(f"Trakt continue watching error: {e}")
+                        tool_outputs.append({"tool": "trakt_continue_watching", "result": f"Error fetching continue watching: {str(e)}"})
 
             # 3. Feed results back to LLM
             # We construct a synthetic history:

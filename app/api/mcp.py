@@ -175,6 +175,10 @@ async def handle_json_rpc(request: JsonRpcRequest):
                                     "user_context": {
                                         "type": "string",
                                         "description": "Additional context (e.g. watch history) to inform the AI."
+                                    },
+                                    "trakt_token": {
+                                        "type": "string",
+                                        "description": "User's Trakt OAuth access token for personalized queries."
                                     }
                                 },
                                 "required": ["query"]
@@ -452,8 +456,9 @@ async def handle_json_rpc(request: JsonRpcRequest):
                 history = args.get("history", [])
                 api_key = args.get("api_key")
                 user_context = args.get("user_context")
+                trakt_token = args.get("trakt_token")
                 
-                response_text = await vector_service.chat(query, history, api_key, user_context)
+                response_text = await vector_service.chat(query, history, api_key, user_context, trakt_token)
                 
                 return {
                     "jsonrpc": "2.0",
